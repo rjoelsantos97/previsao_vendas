@@ -1,14 +1,16 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error
-from datetime import datetime
+from datetime import datetime, timedelta
 import joblib
 
 app = Flask(__name__)
+CORS(app)
 
 model = None
 scaler = None
@@ -44,6 +46,10 @@ def train_model(data):
     y_pred = model.predict(X_test_scaled)
     mse = mean_squared_error(y_test, y_pred)
     
+    # Salvar o modelo e o scaler
+    joblib.dump(model, 'model.joblib')
+    joblib.dump(scaler, 'scaler.joblib')
+    
     return mse
 
 @app.route('/upload', methods=['POST'])
@@ -54,27 +60,54 @@ def upload_file():
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
     if file:
-        # Ler o arquivo CSV
-        data = pd.read_csv(file, parse_dates=['Date'])
-        
-        # Treinar o modelo
-        mse = train_model(data)
-        
-        return jsonify({'message': 'Model trained successfully', 'mse': mse}), 200
+        try:
+            # Ler o arquivo CSV
+            data = pd.read_csv(file, parse_dates=['Date'])
+            
+            # Treinar o modelo
+            mse = train_model(data)
+            
+            return jsonify({'message': 'Model trained successfully', 'mse': mse}), 200
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
 
 @app.route('/predict', methods=['POST'])
 def predict():
     global model, scaler
+    
     if model is None or scaler is None:
-        return jsonify({'error': 'Model not trained'}), 400
+        try:
+            model = joblib.load('model.joblib')
+            scaler = joblib.load('scaler.joblib')
+        except:
+            return jsonify({'error': 'Model not trained'}), 400
     
-    date = request.json['date']
-    date = pd.to_datetime(date)
-    features = np.array([[date.dayofweek, date.day, date.month]])
-    scaled_features = scaler.transform(features)
-    prediction = model.predict(scaled_features)
-    
-    return jsonify({'prediction': prediction[0]}), 200
+    try:
+        start_date = request.json['start_date']
+        end_date = request.json['end_date']
+        
+        start = pd.to_datetime(start_date)
+        end = pd.to_datetime(end_date)
+        
+        date_range = pd.date_range(start, end)
+        predictions = []
+        
+        for date in date_range:
+            features = np.array([[date.dayofweek, date.day, date.month]])
+            scaled_features = scaler.transform(features)
+            prediction = model.predict(scaled_features)
+            predictions.append({
+                'date': date.strftime('%Y-%m-%d'),
+                'prediction': prediction[0]
+            })
+        
+        return jsonify({'predictions': predictions}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/', methods=['GET'])
+def home():
+    return "Welcome to the Sales Prediction API", 200
 
 if __name__ == '__main__':
     app.run(debug=True)
