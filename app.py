@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from prophet import Prophet
+from prophet.forecaster import Prophet
 import base64
 import io
 
