@@ -1,13 +1,9 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from prophet import Prophet
-from prophet.plot import plot_plotly
 import plotly.graph_objs as go
+from statsmodels.tsa.holtwinters import ExponentialSmoothing
 import io
-
-# Substituir np.float_ por np.float64
-np.float_ = np.float64
 
 def load_data(file):
     try:
@@ -26,18 +22,24 @@ def load_data(file):
 def preprocess_data(df, date_column, target_column):
     df[date_column] = pd.to_datetime(df[date_column])
     df = df.rename(columns={date_column: 'ds', target_column: 'y'})
-    df = df[['ds', 'y']].sort_values('ds')
+    df = df[['ds', 'y']].sort_values('ds').set_index('ds')
     return df
 
-def train_model(df, forecast_period):
-    model = Prophet()
-    model.fit(df)
-    future_dates = model.make_future_dataframe(periods=forecast_period)
-    forecast = model.predict(future_dates)
-    return model, forecast
+def train_model_and_forecast(df, forecast_period):
+    model = ExponentialSmoothing(df, seasonal_periods=12, trend='add', seasonal='add')
+    fitted_model = model.fit()
+    forecast = fitted_model.forecast(forecast_period)
+    return fitted_model, forecast
+
+def plot_forecast(df, forecast):
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=df.index, y=df['y'], mode='lines', name='Dados históricos'))
+    fig.add_trace(go.Scatter(x=forecast.index, y=forecast, mode='lines', name='Previsão'))
+    fig.update_layout(title='Previsão de Vendas', xaxis_title='Data', yaxis_title='Vendas')
+    return fig
 
 def main():
-    st.title('Previsão de Vendas com Prophet')
+    st.title('Previsão de Vendas com Statsmodels')
 
     uploaded_file = st.file_uploader("Escolha um arquivo CSV ou Excel", type=['csv', 'xlsx', 'xls'])
     
@@ -59,21 +61,19 @@ def main():
                     st.error("A data de início deve ser anterior à data de fim.")
                 else:
                     df_processed = preprocess_data(df, date_column, target_column)
-                    df_forecast = df_processed[(df_processed['ds'].dt.date >= start_date) & (df_processed['ds'].dt.date <= end_date)]
-
                     forecast_period = (end_date - start_date).days
 
                     if st.button("Realizar Previsão"):
-                        model, forecast = train_model(df_processed, forecast_period)
+                        model, forecast = train_model_and_forecast(df_processed, forecast_period)
 
                         st.subheader("Gráfico de Previsão")
-                        fig = plot_plotly(model, forecast)
+                        fig = plot_forecast(df_processed, forecast)
                         st.plotly_chart(fig)
 
                         st.subheader("Dados da Previsão")
-                        st.write(forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail())
+                        st.write(forecast.tail())
 
-                        csv = forecast.to_csv(index=False)
+                        csv = forecast.to_csv(index=True)
                         st.download_button(
                             label="Download da previsão como CSV",
                             data=csv,
