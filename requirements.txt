@@ -1,6 +1,6 @@
 streamlit
 pandas
-prophet
 numpy
-base64
-io
+prophet
+plotly
+openpyxl
