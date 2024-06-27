@@ -6,6 +6,9 @@ from prophet.plot import plot_plotly
 import plotly.graph_objs as go
 import io
 
+# Substituir np.float_ por np.float64
+np.float_ = np.float64
+
 def load_data(file):
     try:
         if file.name.endswith('.csv'):
