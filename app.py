@@ -4,6 +4,7 @@ import numpy as np
 import plotly.graph_objs as go
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 import io
+from datetime import datetime, date
 
 def load_data(file):
     try:
@@ -53,8 +54,13 @@ def main():
             date_column = st.selectbox("Selecione a coluna de data", df.columns)
             target_column = st.selectbox("Selecione a coluna alvo (vendas)", df.columns)
 
-            start_date = st.date_input("Data de início para previsão", df[date_column].min())
-            end_date = st.date_input("Data de fim para previsão", df[date_column].max())
+            # Converter as datas para o formato correto
+            df[date_column] = pd.to_datetime(df[date_column])
+            min_date = df[date_column].min().date()
+            max_date = df[date_column].max().date()
+
+            start_date = st.date_input("Data de início para previsão", min_date)
+            end_date = st.date_input("Data de fim para previsão", max_date)
 
             if start_date and end_date:
                 if start_date > end_date:
