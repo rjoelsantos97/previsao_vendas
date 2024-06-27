@@ -1,6 +1,6 @@
 streamlit
 pandas
 prophet
-numpy<2.0
+numpy
 base64
 io
