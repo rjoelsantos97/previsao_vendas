@@ -1,4 +1,6 @@
 streamlit
 pandas
 prophet
-openpyxl
+numpy<2.0
+base64
+io
